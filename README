@@ -1,0 +1,5 @@
+
+The aim of this script is to be a very simple rss reader.
+It read rss feeds from a list, and generates a time ordered html page of each link, for the last week.
+It stores the readed feeds to reduce bandwidth when re-reading feeds.
+
