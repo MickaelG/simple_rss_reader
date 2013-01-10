@@ -5,10 +5,11 @@
 ["http://linuxfr.org/news.atom", "http://linuxfr.org/favicon.png"],
 ["http://standblog.org/blog/feed/atom", ""],
 ["http://www.maitre-eolas.fr/feed/atom", ""],
-["http://www.lense.fr/welcome/feed/", "http://www.lense.fr/wp-content/themes/lense/images/lense_favicon.ico"],
+["http://www.lense.fr/blog/feed/", "http://www.lense.fr/wp-content/themes/lense/images/lense_favicon.ico"],
 ["http://feeds.feedburner.com/DigitalPhotographySchool", "http://digital-photography-school.com/favicon.ico"],
 ["http://what-if.xkcd.com/feed.atom", "http://what-if.xkcd.com/imgs/favicon.ico"],
 ["http://sametmax.com/feed/", "http://sametmax.com/wp-content/uploads/2012/05/favicon.ico"],
-["http://feeds2.feedburner.com/WhereIsPloum", ""]
+["http://feeds2.feedburner.com/WhereIsPloum", ""],
+["http://blog.fdn.fr/?feed/atom", "http://www.fdn.fr/fdn_skel/fdn_favicon.png"]
 ]
 
