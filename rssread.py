@@ -65,6 +65,7 @@ out.write( """
 <title>Suivi des flux RSS</title>
 </head>
 <body>
+<a href="update">update</a></br>
 """)
 
 today = datetime.datetime.now()
