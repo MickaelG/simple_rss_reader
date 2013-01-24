@@ -2,6 +2,9 @@
 
 import feedparser, json, datetime, pickle, copy
 
+debug = False
+
+
 feeds_list = json.load(open("feeds.json",'r'))
 
 feeds_file_name = "tmpfeeds.pickle"
@@ -25,18 +28,21 @@ for (url,img) in feeds_list:
 		try:
 			etag = prev_feed.etag
 		except AttributeError:
-			print ("Warning: feed {} has no etag attribute".format(url))
+			if debug:
+				print ("Warning: feed {} has no etag attribute".format(url))
 			etag = None
 		try:
 			modified = prev_feed.modified
 		except AttributeError:
-			print ("Warning: feed {} has no modified attribute".format(url))
+			if debug:
+				print ("Warning: feed {} has no modified attribute".format(url))
 			modified = None
 		feed = feedparser.parse(url, etag=etag, modified=modified)
 	else:
 		feed = feedparser.parse(url)
 	if feed.status == 304:
-		print ("Information: feed {} returned a 304 status. Keeping old feed".format(url))
+		if debug:
+			print ("Information: feed {} returned a 304 status. Keeping old feed".format(url))
 	else:
 		feed['img'] = img
 		loaded_feeds[url] = copy.copy(feed)
@@ -45,7 +51,8 @@ with open(feeds_file_name, "wb") as f:
 	pickle.dump(loaded_feeds, f)
 
 for (url, feed) in loaded_feeds.items():
-	print ("Decoding feeds from {}".format(url))
+	if debug:
+		print ("Decoding feeds from {}".format(url))
 	for item in feed['items']:
 		item['img']=feed['img']
 	entries.extend( feed['items'] )
