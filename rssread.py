@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 
-import feedparser, json, datetime, pickle, copy
+import feedparser, json, datetime, pickle, copy, queue, threading
 
 debug = False
 
+max_connections = 15
 
 feeds_list = json.load(open("feeds.json",'r'))
 
@@ -17,8 +18,11 @@ try:
 except FileNotFoundError:
 	loaded_feeds = {}
 
-for (url,img) in feeds_list:
-	print ("Reading feeds from {}".format(url))
+url_queue = queue.Queue(max_connections)
+
+def get_rss( url, img="" ):
+	if debug:
+		print ("Reading feeds from {}".format(url))
 	try:
 		prev_feed = loaded_feeds[url]
 	except KeyError:
@@ -46,6 +50,23 @@ for (url,img) in feeds_list:
 	else:
 		feed['img'] = img
 		loaded_feeds[url] = copy.copy(feed)
+
+def worker():
+	while True:
+		(url,img) = url_queue.get()
+		get_rss( url, img )
+		url_queue.task_done()
+
+for i_thread in range(max_connections):
+	t = threading.Thread(target=worker)
+	t.daemon = True
+	t.start()
+
+for url, img in feeds_list:
+	url_queue.put( (url, img) )
+	#get_rss(url,img)
+
+url_queue.join()
 
 with open(feeds_file_name, "wb") as f:
 	pickle.dump(loaded_feeds, f)
