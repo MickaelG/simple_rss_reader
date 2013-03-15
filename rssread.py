@@ -117,6 +117,6 @@ for elem in sorted_entries:
 	age = today-date
 	if age.total_seconds() > 7*24*60*60:
 		break
-	out.write( '{} <img src="{}" width=16/><a href={}>{}</a><br/>'.format(date.strftime("%d %b - %Hh%M"), elem['img'], elem['link'], elem['title']) )
+	out.write( '{} <img src="{}" width=16/><a href={}>{}</a><br/>\n'.format(date.strftime("%d %b - %Hh%M"), elem['img'], elem['link'], elem['title']) )
 
 out.write( "</body></html>")
