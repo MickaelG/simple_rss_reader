@@ -13,6 +13,8 @@
 ["http://blog.fdn.fr/?feed/atom", "http://www.fdn.fr/fdn_skel/fdn_favicon.png"],
 ["http://feeds.feedburner.com/37signals/beMH", "http://37signals.com/svn/favicon.ico"],
 ["http://xkcd.com/rss.xml", "http://xkcd.com/favicon.ico"],
+["http://blog.slate.fr/sagalovitsch/feed/", ""],
+["http://reflets.info/feed/", "http://reflets.info/favicon.ico"],
 ["http://www.alternatives-economiques.fr/fr-0002.xml","http://www.alternatives-economiques.fr/favico-ae.ico"]
 ]
 
