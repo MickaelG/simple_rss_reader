@@ -12,12 +12,16 @@ feeds_file_name = "tmpfeeds.pickle"
 
 entries=[]
 
+import socket
+socket.setdefaulttimeout(10)
+
 try:
 	with open(feeds_file_name, "rb") as f:
 		loaded_feeds = pickle.load(f)
 except FileNotFoundError:
 	loaded_feeds = {}
 
+error_list = []
 url_queue = queue.Queue(max_connections)
 
 def get_rss( url, img="" ):
@@ -27,29 +31,36 @@ def get_rss( url, img="" ):
 		prev_feed = loaded_feeds[url]
 	except KeyError:
 		prev_feed = None
-	if prev_feed:
-		#http://packages.python.org/feedparser/http-etag.html#using-etags-to-reduce-bandwidth
-		try:
-			etag = prev_feed.etag
-		except AttributeError:
+	try:
+		if prev_feed:
+			#http://packages.python.org/feedparser/http-etag.html#using-etags-to-reduce-bandwidth
+			try:
+				etag = prev_feed.etag
+			except AttributeError:
+				if debug:
+					print ("Warning: feed {} has no etag attribute".format(url))
+				etag = None
+			try:
+				modified = prev_feed.modified
+			except AttributeError:
+				if debug:
+					print ("Warning: feed {} has no modified attribute".format(url))
+				modified = None
+			feed = feedparser.parse(url, etag=etag, modified=modified)
+		else:
+			feed = feedparser.parse(url)
+		if feed.status == 304:
 			if debug:
-				print ("Warning: feed {} has no etag attribute".format(url))
-			etag = None
-		try:
-			modified = prev_feed.modified
-		except AttributeError:
+				print ("Information: feed {} returned a 304 status. Keeping old feed".format(url))
+		else:
+			feed['img'] = img
+			loaded_feeds[url] = copy.copy(feed)
 			if debug:
-				print ("Warning: feed {} has no modified attribute".format(url))
-			modified = None
-		feed = feedparser.parse(url, etag=etag, modified=modified)
-	else:
-		feed = feedparser.parse(url)
-	if feed.status == 304:
+				print ("Information: feed {} retrieved".format(url))
+	except:
+		error_list.append(url)
 		if debug:
-			print ("Information: feed {} returned a 304 status. Keeping old feed".format(url))
-	else:
-		feed['img'] = img
-		loaded_feeds[url] = copy.copy(feed)
+			print ("Error while retrieving feed {}".format(url))
 
 def worker():
 	while True:
@@ -96,6 +107,9 @@ out.write( """
 """)
 
 today = datetime.datetime.now()
+
+for url in error_list:
+	out.write("Error while retrieving {}</br></a>\n".format(url))
 
 for elem in sorted_entries:
 	datep = elem['updated_parsed']
