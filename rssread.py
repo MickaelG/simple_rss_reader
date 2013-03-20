@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-import feedparser, json, datetime, pickle, copy, queue, threading
+import feedparser, json, datetime, time, pickle, copy, queue, threading
 
-debug = False
+debug = True
 
 max_connections = 15
 
@@ -58,9 +58,12 @@ def get_rss( url, img="" ):
 			if debug:
 				print ("Information: feed {} retrieved".format(url))
 	except:
-		error_list.append(url)
-		if debug:
-			print ("Error while retrieving feed {}".format(url))
+		error("Error while retrieving feed {}".format(url))
+
+def error(msg):
+	error_list.append(msg)
+	if debug:
+		print ("ERROR: " + msg)
 
 def worker():
 	while True:
@@ -87,6 +90,9 @@ for (url, feed) in loaded_feeds.items():
 		print ("Decoding feeds from {}".format(url))
 	for item in feed['items']:
 		item['img']=feed['img']
+		if item["updated_parsed"] == None:
+			error("date error for entry {} in feed {}".format(item['title'], url))
+			item["updated_parsed"] = time.localtime()
 	entries.extend( feed['items'] )
 
 sorted_entries=sorted(entries, key=lambda entry: entry["updated_parsed"])
