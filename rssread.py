@@ -24,7 +24,10 @@ except FileNotFoundError:
 error_list = []
 url_queue = queue.Queue(max_connections)
 
-def get_rss( url, img="" ):
+def get_rss( feed_descr ):
+	url = feed_descr['url']
+	img = feed_descr.get('img', '')
+	wotags = feed_descr.get('wotags', [])
 	if debug:
 		print ("Reading feeds from {}".format(url))
 	try:
@@ -54,6 +57,7 @@ def get_rss( url, img="" ):
 				print ("Information: feed {} returned a 304 status. Keeping old feed".format(url))
 		else:
 			feed['img'] = img
+			feed['wotags'] = wotags
 			loaded_feeds[url] = copy.copy(feed)
 			if debug:
 				print ("Information: feed {} retrieved".format(url))
@@ -67,8 +71,8 @@ def error(msg):
 
 def worker():
 	while True:
-		(url,img) = url_queue.get()
-		get_rss( url, img )
+		feed_descr = url_queue.get()
+		get_rss( feed_descr )
 		url_queue.task_done()
 
 for i_thread in range(max_connections):
@@ -76,9 +80,8 @@ for i_thread in range(max_connections):
 	t.daemon = True
 	t.start()
 
-for url, img in feeds_list:
-	url_queue.put( (url, img) )
-	#get_rss(url,img)
+for feed_descr in feeds_list:
+	url_queue.put( feed_descr )
 
 url_queue.join()
 
@@ -93,7 +96,14 @@ for (url, feed) in loaded_feeds.items():
 		if item["updated_parsed"] == None:
 			error("date error for entry {} in feed {}".format(item['title'], url))
 			item["updated_parsed"] = time.localtime()
-	entries.extend( feed['items'] )
+		if item.has_key('tags'):
+			taglist = [tag['term'] for tag in item['tags']]
+			item['taglist'] = taglist
+		else:
+			item['taglist'] = []
+		#we filter out items with tags in wotags list
+		if not list(set(item['taglist']) & set(feed['wotags'])):
+			entries.append( item )
 
 sorted_entries=sorted(entries, key=lambda entry: entry["updated_parsed"])
 sorted_entries.reverse()
@@ -114,8 +124,8 @@ out.write( """
 
 today = datetime.datetime.now()
 
-for url in error_list:
-	out.write("Error while retrieving {}</br></a>\n".format(url))
+for msg in error_list:
+	out.write("{}</br></a>\n".format(msg))
 
 for elem in sorted_entries:
 	datep = elem['updated_parsed']
