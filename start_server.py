@@ -22,5 +22,5 @@ def update():
 	os.system("python3 rssread.py")
 	return bottle.static_file("index.html", root=".")
 
-bottle.run(app, host='localhost', port=8080)
+bottle.run(app, host='0.0.0.0', port=8080)
 
