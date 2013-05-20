@@ -127,20 +127,37 @@ out.write( """
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <title>Suivi des flux RSS</title>
 </head>
+<style>
+.date { text-align:right; margin-right:200px }
+.content { max-width:1000px; margin-left:auto; margin-right:auto }
+.link { margin-left:16px; text-indent:-16px }
+.link_bloc { }
+</style>
 <body>
 """)
 
-today = datetime.datetime.now()
+today = datetime.date.today()
 
 for msg in error_list:
 	out.write("{}</br></a>\n".format(msg))
 
+out.write("<div class=content>\n")
+
+curr_date = None
 for elem in sorted_entries:
 	datep = elem['updated_parsed']
-	date = datetime.datetime(datep[0], datep[1], datep[2], datep[3], datep[4])
+	date = datetime.date(datep[0], datep[1], datep[2])
+	time = datetime.time(datep[3], datep[4])
 	age = today-date
-	if age.total_seconds() > 7*24*60*60:
+	if age.total_seconds()/(3600*24) > 7:
 		break
-	out.write( '{} <img src="{}" width=16/><a href={}>{}</a><br/>\n'.format(date.strftime("%d %b - %Hh%M"), elem['img'], elem['link'], elem['title']) )
+	if date != curr_date:
+		if curr_date is not None:
+			out.write("</div>\n") #End of previous link_bloc
+		out.write("<div class=date>{}</div>\n".format(date.strftime("%d %B")))
+		out.write("<div class=link_bloc>\n")
+		curr_date = date
+	title_str = ", ".join(elem['taglist'])
+	out.write( '<div class=link><img src="{}" width=16/><a href={} title="{}">{}</a></div>\n'.format(elem['img'], elem['link'], title_str, elem['title']) )
 
-out.write( "</body></html>")
+out.write( "</div></div></body></html>")
