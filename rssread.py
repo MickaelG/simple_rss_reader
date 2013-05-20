@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import feedparser, json, datetime, time, pickle, copy, queue, threading
+import feedparser, json, datetime, time, pickle, copy, queue, threading, os
 
 debug = True
 
@@ -15,13 +15,21 @@ entries=[]
 import socket
 socket.setdefaulttimeout(10)
 
+error_list = []
+def error(msg):
+	error_list.append(msg)
+	if debug:
+		print ("ERROR: " + msg)
+
 try:
 	with open(feeds_file_name, "rb") as f:
 		loaded_feeds = pickle.load(f)
 except FileNotFoundError:
 	loaded_feeds = {}
+except Exception as e:
+	error("tmp pickle file reading failed :" + str(e))
+	loaded_feeds = {}
 
-error_list = []
 url_queue = queue.Queue(max_connections)
 
 def get_rss( feed_descr ):
@@ -64,11 +72,6 @@ def get_rss( feed_descr ):
 	except:
 		error("Error while retrieving feed {}".format(url))
 
-def error(msg):
-	error_list.append(msg)
-	if debug:
-		print ("ERROR: " + msg)
-
 def worker():
 	while True:
 		feed_descr = url_queue.get()
@@ -85,8 +88,13 @@ for feed_descr in feeds_list:
 
 url_queue.join()
 
-with open(feeds_file_name, "wb") as f:
+try:
+	f = open(feeds_file_name, "wb")
 	pickle.dump(loaded_feeds, f)
+except Exception as e:
+	os.remove(feeds_file_name)
+	error("tmp pickle file write failed: " + str(e))
+
 
 for (url, feed) in loaded_feeds.items():
 	if debug:
