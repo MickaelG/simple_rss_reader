@@ -128,9 +128,12 @@ out.write( """
 <title>Suivi des flux RSS</title>
 </head>
 <style>
-.date { text-align:right; margin-right:200px }
+a:link {text-decoration:none; color:black}
+a:hover {text-decoration:underline}
+a:visited {color:grey}
+.date { text-align:right; margin-right:200px; font-weight:bold }
 .content { max-width:1000px; margin-left:auto; margin-right:auto }
-.link { margin-left:16px; text-indent:-16px }
+.link { margin-left:16px; text-indent:-16px; line-height:150% }
 .link_bloc { }
 </style>
 <body>
@@ -158,6 +161,6 @@ for elem in sorted_entries:
 		out.write("<div class=link_bloc>\n")
 		curr_date = date
 	title_str = ", ".join(elem['taglist'])
-	out.write( '<div class=link><img src="{}" width=16/><a href={} title="{}">{}</a></div>\n'.format(elem['img'], elem['link'], title_str, elem['title']) )
+	out.write( '<div class=link><img src="{}" width=16/> <a href={} title="{}">{}</a></div>\n'.format(elem['img'], elem['link'], title_str, elem['title']) )
 
 out.write( "</div></div></body></html>")
