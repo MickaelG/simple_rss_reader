@@ -50,10 +50,8 @@ def get_rss( feed_descr ):
     wotags = feed_descr.get('wotags', [])
     if debug:
         print ("Reading feeds from {}".format(url))
-    try:
-        prev_feed = loaded_feeds[url]
-    except KeyError:
-        prev_feed = None
+    prev_feed = loaded_feeds.get(url)
+
     try:
         if prev_feed:
             #http://packages.python.org/feedparser/http-etag.html#using-etags-to-reduce-bandwidth
@@ -113,7 +111,7 @@ for (url, feed) in loaded_feeds.items():
         print ("Decoding feeds from {}".format(url))
     for item in feed['items']:
         item['img']=feed['img']
-        if item["updated_parsed"] == None:
+        if item["updated_parsed"] is None:
             error("date error for entry {} in feed {}".format(item['title'], url))
             item["updated_parsed"] = time.localtime()
         if item.has_key('tags'):
@@ -122,7 +120,7 @@ for (url, feed) in loaded_feeds.items():
         else:
             item['taglist'] = []
         #we filter out items with tags in wotags list
-        if not list(set(item['taglist']) & set(feed['wotags'])):
+        if not set(item['taglist']) & set(feed['wotags']):
             entries.append( item )
 
 sorted_entries=sorted(entries, key=lambda entry: entry["updated_parsed"])
