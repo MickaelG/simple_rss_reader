@@ -44,7 +44,7 @@ except Exception as e:
 url_queue = queue.Queue(max_connections)
 
 
-def get_rss( feed_descr ):
+def get_rss(feed_descr):
     url = feed_descr['url']
     img = feed_descr.get('img', '')
     wotags = feed_descr.get('wotags', [])
@@ -82,10 +82,11 @@ def get_rss( feed_descr ):
     except:
         error("Error while retrieving feed {}".format(url))
 
+
 def worker():
     while True:
         feed_descr = url_queue.get()
-        get_rss( feed_descr )
+        get_rss(feed_descr)
         url_queue.task_done()
 
 for i_thread in range(max_connections):
@@ -94,7 +95,7 @@ for i_thread in range(max_connections):
     t.start()
 
 for feed_descr in feeds_list:
-    url_queue.put( feed_descr )
+    url_queue.put(feed_descr)
 
 url_queue.join()
 
@@ -110,26 +111,26 @@ for (url, feed) in loaded_feeds.items():
     if debug:
         print ("Decoding feeds from {}".format(url))
     for item in feed['items']:
-        item['img']=feed['img']
+        item['img'] = feed['img']
         if item["updated_parsed"] is None:
             error("date error for entry {} in feed {}".format(item['title'], url))
             item["updated_parsed"] = time.localtime()
-        if item.has_key('tags'):
+        if 'tags' in item:
             taglist = [tag['term'] for tag in item['tags']]
             item['taglist'] = taglist
         else:
             item['taglist'] = []
         #we filter out items with tags in wotags list
         if not set(item['taglist']) & set(feed['wotags']):
-            entries.append( item )
+            entries.append(item)
 
-sorted_entries=sorted(entries, key=lambda entry: entry["updated_parsed"])
+sorted_entries = sorted(entries, key=lambda entry: entry["updated_parsed"])
 sorted_entries.reverse()
 
 out_file = "index.html"
-out=open(out_file, "w")
+out = open(out_file, "w")
 
-out.write( """
+out.write("""
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="fr" lang="fr">
@@ -171,6 +172,6 @@ for elem in sorted_entries:
         out.write("<div class=link_bloc>\n")
         curr_date = date
     title_str = ", ".join(elem['taglist'])
-    out.write( '<div class=link><img src="{}" width=16/> <a href={} title="{}">{}</a></div>\n'.format(elem['img'], elem['link'], title_str, elem['title']) )
+    out.write('<div class=link><img src="{}" width=16/> <a href={} title="{}">{}</a></div>\n'.format(elem['img'], elem['link'], title_str, elem['title']))
 
 out.write("</div></div></body></html>")
