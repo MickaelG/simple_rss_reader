@@ -1,0 +1,4 @@
+RewriteEngine on
+RewriteBase /rss
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ rss.cgi/$1 [L]
