@@ -120,6 +120,7 @@ def generate_links_list(feeds):
     date_links = []
     sorted_entries = sorted(all_links, key=lambda entry: entry.timestamp, reverse=True)
     for entry in sorted_entries:
+        assert(entry.date is not None)
         age = today - entry.date
         if age.total_seconds() / (3600 * 24) > 7:
             break
@@ -129,7 +130,8 @@ def generate_links_list(feeds):
             date_links = []
             curr_date = entry.date
         date_links.append(entry)
-    links.append({"date": curr_date.strftime("%d %B"), "links": date_links})
+    if date_links:
+        links.append({"date": curr_date.strftime("%d %B"), "links": date_links})
 
     return links
 
