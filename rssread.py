@@ -4,10 +4,12 @@ import sys
 
 import json
 import datetime
-import logging
 import sqlite3
 import argparse
 import urllib.request
+
+import logging
+logging.getLogger().setLevel(logging.DEBUG)
 
 import feedparser
 import flask
@@ -207,10 +209,8 @@ def get_favicon_url(base_url):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='simple rss read server')
-    parser.add_argument("--debug", action='store_true', help='Activate debug mode')
     parser.add_argument("--update", action='store_true', help='Update feeds instead of running the server')
     args = parser.parse_args()
-    logging.getLogger().setLevel(logging.DEBUG)
 
     if args.update:
         update()
