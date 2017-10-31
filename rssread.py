@@ -106,10 +106,6 @@ def read_feeds_list(file_handle):
     return feeds
 
 
-def generate_index_html(links, errors):
-    return flask.render_template("index.html", errors=errors, links=links)
-
-
 def generate_links_list(feeds):
     all_links = feeds.collect_links()
     today = datetime.date.today()
@@ -166,7 +162,7 @@ def root():
         feeds = get_saved_feeds(db_connection)
     links = generate_links_list(feeds)
     errors = []
-    return generate_index_html(links, errors)
+    return flask.render_template("index.html", errors=errors, links=links)
 
 
 @app.route("/feeds")
@@ -185,7 +181,7 @@ def update():
     with sqlite3.connect("cache.db") as db_connection:
         save_feeds(feeds, db_connection)
     links = generate_links_list(feeds)
-    return generate_index_html(links, errors)
+    return flask.render_template("index.html", errors=errors, links=links)
 
 
 #@app.route("/favicon/<base_url:path>")
