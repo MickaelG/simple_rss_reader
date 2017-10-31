@@ -1,177 +1,218 @@
 #!/usr/bin/python3
 
-import feedparser
+import sys
+
 import json
 import datetime
-import time
-import pickle
-import copy
-import queue
-import threading
-import os
+import logging
+import sqlite3
+import argparse
+import urllib.request
+
+import feedparser
+import flask
+app = flask.Flask(__name__)
 
 import socket
 socket.setdefaulttimeout(10)
 
-debug = True
-
-max_connections = 15
-
-feeds_list = json.load(open("feeds.json", 'r'))
-
-feeds_file_name = "tmpfeeds.pickle"
-
-entries = []
-
-error_list = []
+import bs4
 
 
-def error(msg):
-    error_list.append(msg)
-    if debug:
-        print ("ERROR: " + msg)
+class Feeds:
+    def __init__(self):
+        self.content = []
+
+    def __len__(self):
+        return len(self.content)
+
+    def __getitem__(self, key):
+        return self.content[key]
+
+    def __str__(self):
+        return "\n".join([str(feed) for feed in self.content])
+
+    def add_feed(self, url, img_url):
+        new_feed = Feed(url, img_url)
+        self.content.append(new_feed)
+        return new_feed
+
+    def parse(self):
+        for feed in self.content:
+            feed.parse()
+
+    def collect_links(self):
+        result = []
+        for feed in self.content:
+            for entry in feed.content:
+                result.append(entry)
+        return result
 
 
-try:
-    with open(feeds_file_name, "rb") as f:
-        loaded_feeds = pickle.load(f)
-except FileNotFoundError:
-    loaded_feeds = {}
-except Exception as e:
-    error("tmp pickle file reading failed :" + str(e))
-    loaded_feeds = {}
+class Feed:
+    def __init__(self, url, img_url=None):
+        self.url = url
+        self.img_url = img_url
+        self.content = []
 
-url_queue = queue.Queue(max_connections)
+    def __str__(self):
+        head_str = self.url + " (" + self.img_url + ")"
+        return head_str + "\n" + "\n".join(["  " + str(entry) for entry in self.content])
 
-
-def get_rss(feed_descr):
-    url = feed_descr['url']
-    img = feed_descr.get('img', '')
-    wotags = feed_descr.get('wotags', [])
-    if debug:
-        print ("Reading feeds from {}".format(url))
-    prev_feed = loaded_feeds.get(url)
-
-    try:
-        if prev_feed:
-            #http://packages.python.org/feedparser/http-etag.html#using-etags-to-reduce-bandwidth
-            try:
-                etag = prev_feed.etag
-            except AttributeError:
-                if debug:
-                    print ("Warning: feed {} has no etag attribute".format(url))
-                etag = None
-            try:
-                modified = prev_feed.modified
-            except AttributeError:
-                if debug:
-                    print ("Warning: feed {} has no modified attribute".format(url))
-                modified = None
-            feed = feedparser.parse(url, etag=etag, modified=modified)
-        else:
-            feed = feedparser.parse(url)
-        if feed.status == 304:
-            if debug:
-                print ("Information: feed {} returned a 304 status. Keeping old feed".format(url))
-        else:
-            feed['img'] = img
-            feed['wotags'] = wotags
-            loaded_feeds[url] = copy.copy(feed)
-            if debug:
-                print ("Information: feed {} retrieved".format(url))
-    except:
-        error("Error while retrieving feed {}".format(url))
+    def parse(self):
+        logging.debug("Parsing feed " + self.url)
+        parsed_feed = feedparser.parse(self.url)
+        for item in parsed_feed['items']:
+            link = item['link']
+            title = item['title']
+            datep = item['updated_parsed']
+            date = datetime.datetime(datep[0], datep[1], datep[2],
+                                     datep[3], datep[4])
+            self.content.append(FeedEntry(self, title, link, date, None))
 
 
-def worker():
-    while True:
-        feed_descr = url_queue.get()
-        get_rss(feed_descr)
-        url_queue.task_done()
+class FeedEntry:
+    def __init__(self, parent_feed, title, url, timestamp, tags=None):
+        self.parent_feed = parent_feed
+        self.title = title
+        self.url = url
+        assert(isinstance(timestamp, datetime.datetime)), timestamp
+        self.timestamp = timestamp
+        self.tags = tags
 
-for i_thread in range(max_connections):
-    t = threading.Thread(target=worker)
-    t.daemon = True
-    t.start()
+    def __str__(self):
+        return self.title + ": " + self.url + " (" + date_to_str(self.timestamp) + ")"
 
-for feed_descr in feeds_list:
-    url_queue.put(feed_descr)
+    @property
+    def img_url(self):
+        return self.parent_feed.img_url
 
-url_queue.join()
-
-try:
-    f = open(feeds_file_name, "wb")
-    pickle.dump(loaded_feeds, f)
-except Exception as e:
-    os.remove(feeds_file_name)
-    error("tmp pickle file write failed: " + str(e))
+    @property
+    def date(self):
+        return self.timestamp.date()
 
 
-for (url, feed) in loaded_feeds.items():
-    if debug:
-        print ("Decoding feeds from {}".format(url))
-    for item in feed['items']:
-        item['img'] = feed['img']
-        if item["updated_parsed"] is None:
-            error("date error for entry {} in feed {}".format(item['title'], url))
-            item["updated_parsed"] = time.localtime()
-        if 'tags' in item:
-            taglist = [tag['term'] for tag in item['tags']]
-            item['taglist'] = taglist
-        else:
-            item['taglist'] = []
-        #we filter out items with tags in wotags list
-        if not set(item['taglist']) & set(feed['wotags']):
-            entries.append(item)
+def date_to_str(date):
+    return date.strftime("%Y-%m-%d %H:%M:%S")
 
-sorted_entries = sorted(entries, key=lambda entry: entry["updated_parsed"])
-sorted_entries.reverse()
 
-out_file = "index.html"
-out = open(out_file, "w")
+def read_feeds_list(file_handle):
+    parsed_feeds = json.load(file_handle)
+    feeds = Feeds()
+    for feed in parsed_feeds:
+        feeds.add_feed(feed["url"], feed.get("img", None))
+    return feeds
 
-out.write("""
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="fr" lang="fr">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<title>Suivi des flux RSS</title>
-</head>
-<style>
-a:link {text-decoration:none; color:black}
-a:hover {text-decoration:underline}
-a:visited {color:grey}
-.date { text-align:right; margin-right:200px; font-weight:bold }
-.content { max-width:1000px; margin-left:auto; margin-right:auto }
-.link { margin-left:16px; text-indent:-16px; line-height:150% }
-.link_bloc { }
-</style>
-<body>
-""")
 
-today = datetime.date.today()
+def generate_index_html(links, errors):
+    return flask.render_template("index.html", errors=errors, links=links)
 
-for msg in error_list:
-    out.write("{}</br></a>\n".format(msg))
 
-out.write("<div class=content>\n")
+def generate_links_list(feeds):
+    all_links = feeds.collect_links()
+    today = datetime.date.today()
 
-curr_date = None
-for elem in sorted_entries:
-    datep = elem['updated_parsed']
-    date = datetime.date(datep[0], datep[1], datep[2])
-    time = datetime.time(datep[3], datep[4])
-    age = today - date
-    if age.total_seconds() / (3600 * 24) > 7:
-        break
-    if date != curr_date:
-        if curr_date is not None:
-            out.write("</div>\n")  # End of previous link_bloc
-        out.write("<div class=date>{}</div>\n".format(date.strftime("%d %B")))
-        out.write("<div class=link_bloc>\n")
-        curr_date = date
-    title_str = ", ".join(elem['taglist'])
-    out.write('<div class=link><img src="{}" width=16/> <a href={} title="{}">{}</a></div>\n'.format(elem['img'], elem['link'], title_str, elem['title']))
+    links = []
 
-out.write("</div></div></body></html>")
+    curr_date = None
+    date_links = []
+    sorted_entries = sorted(all_links, key=lambda entry: entry.timestamp, reverse=True)
+    for entry in sorted_entries:
+        age = today - entry.date
+        if age.total_seconds() / (3600 * 24) > 7:
+            break
+        if entry.date != curr_date:
+            if curr_date is not None:
+                links.append({"date": curr_date.strftime("%d %B"), "links": date_links})
+            date_links = []
+            curr_date = entry.date
+        date_links.append(entry)
+    links.append({"date": curr_date.strftime("%d %B"), "links": date_links})
+
+    return links
+
+
+def save_feeds(feeds, db_connection):
+    db_connection.execute('DROP TABLE IF EXISTS links')
+    db_connection.execute('DROP TABLE IF EXISTS feeds')
+    db_connection.execute('CREATE TABLE IF NOT EXISTS feeds (id INTEGER PRIMARY KEY, url TEXT, img_url TEXT)')
+    db_connection.execute('CREATE TABLE IF NOT EXISTS links (feed_id INTEGER, title TEXT, url TEXT, timestamp TEXT, FOREIGN KEY(feed_id) REFERENCES feeds(id))')
+    for ifeed, feed in enumerate(feeds.content):
+        db_connection.execute('INSERT INTO feeds VALUES (?, ?, ?)', (ifeed, feed.url, feed.img_url))
+        for link in feed.content:
+            db_connection.execute('INSERT INTO links VALUES (?, ?, ?, ?)', (ifeed, link.title, link.url, date_to_str(link.timestamp)))
+    db_connection.commit()
+
+
+def get_saved_feeds(db_connection):
+    feeds = Feeds()
+    feed_cursor = db_connection.cursor()
+    for feed_row in feed_cursor.execute('SELECT * FROM feeds'):
+        feed = feeds.add_feed(feed_row[1], feed_row[2])
+        link_cursor = db_connection.cursor()
+        for link_row in link_cursor.execute('SELECT * FROM links WHERE feed_id=?', (feed_row[0],)):
+            timestamp = datetime.datetime.strptime(link_row[3], "%Y-%m-%d %H:%M:%S")
+            feed.content.append(FeedEntry(feed, link_row[1], link_row[2], timestamp))
+    return feeds
+
+
+@app.route("/")
+def root():
+    with sqlite3.connect("cache.db") as db_connection:
+        feeds = get_saved_feeds(db_connection)
+    links = generate_links_list(feeds)
+    errors = []
+    return generate_index_html(links, errors)
+
+
+@app.route("/feeds")
+def feeds():
+    with open("feeds.json", "r") as f:
+        feeds = read_feeds_list(f)
+    return flask.render_template("feeds.html", feeds=feeds)
+
+
+@app.route("/update")
+def update():
+    with open("feeds.json", "r") as f:
+        feeds = read_feeds_list(f)
+    feeds.parse()
+    errors = []
+    with sqlite3.connect("cache.db") as db_connection:
+        save_feeds(feeds, db_connection)
+    links = generate_links_list(feeds)
+    return generate_index_html(links, errors)
+
+
+#@app.route("/favicon/<base_url:path>")
+def get_favicon_url(base_url):
+    req = urllib.request.Request(base_url, headers={'User-Agent': 'Mozilla/5.0'})
+    html = urllib.request.urlopen(req).read()
+    soup = bs4.BeautifulSoup(html, "html.parser")
+    icon_link = soup.find("link", rel="shortcut icon")
+    if icon_link is None:
+        icon_link = soup.find("link", rel="icon")
+    if icon_link is None:
+        logging.debug("No favicon found in html of " + base_url + ", trying default")
+        favicon = "%s/favicon.ico" % base_url
+        try:
+            urllib.request.urlopen(favicon)
+        except HTTPError:
+            logging.debug("Default favicon does not exist")
+            favicon = None
+    else:
+        favicon = icon_link['href']
+    return favicon
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='simple rss read server')
+    parser.add_argument("--debug", action='store_true', help='Activate debug mode')
+    parser.add_argument("--update", action='store_true', help='Update feeds instead of running the server')
+    args = parser.parse_args()
+    logging.getLogger().setLevel(logging.DEBUG)
+
+    if args.update:
+        update()
+        sys.exit(0)
+
