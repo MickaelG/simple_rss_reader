@@ -9,8 +9,8 @@ import sqlite3
 import argparse
 
 import feedparser
-from bottle import template, run, route
-import bottle
+import flask
+app = flask.Flask(__name__)
 
 import socket
 socket.setdefaulttimeout(10)
@@ -102,7 +102,7 @@ def read_feeds_list(file_handle):
 
 
 def generate_index_html(links, errors):
-    return template("index", errors=errors, links=links)
+    return flask.render_template("index.html", errors=errors, links=links)
 
 
 def generate_links_list(feeds):
@@ -153,7 +153,7 @@ def get_saved_feeds(db_connection):
     return feeds
 
 
-@route("/")
+@app.route("/")
 def root():
     with sqlite3.connect("cache.db") as db_connection:
         feeds = get_saved_feeds(db_connection)
@@ -162,7 +162,14 @@ def root():
     return generate_index_html(links, errors)
 
 
-@route("/update")
+@app.route("/feeds")
+def feeds():
+    with open("feeds.json", "r") as f:
+        feeds = read_feeds_list(f)
+    return flask.render_template("feeds.html", feeds=feeds)
+
+
+@app.route("/update")
 def update():
     with open("feeds.json", "r") as f:
         feeds = read_feeds_list(f)
@@ -179,14 +186,9 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action='store_true', help='Activate debug mode')
     parser.add_argument("--update", action='store_true', help='Update feeds instead of running the server')
     args = parser.parse_args()
+    logging.getLogger().setLevel(logging.DEBUG)
 
     if args.update:
-        logging.getLogger().setLevel(logging.DEBUG)
         update()
         sys.exit(0)
-
-    if args.debug:
-        bottle.debug(True)
-        logging.getLogger().setLevel(logging.DEBUG)
-    run(reloader=args.debug)
 

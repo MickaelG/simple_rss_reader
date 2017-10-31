@@ -12,20 +12,29 @@ a:visited {color:grey}
 .content { max-width:1000px; margin-left:auto; margin-right:auto }
 .link { margin-left:16px; text-indent:-16px; line-height:150% }
 .link_bloc { }
+.menu { text-align:right }
+.menu ul { list-style-type:none }
+.menu li { display:inline }
 </style>
 <body>
-% for msg in errors:
+<nav class="menu">
+  <ul>
+    <li><a href="/">Home</a></li>
+    <li><a href="feeds">Feeds</a></li>
+  </ul>
+</nav>
+{% for msg in errors %}
     {{msg}}</br></a>
-% end
+{% endfor %}
 <div class=content>
-% for links_for_day in links:
+{% for links_for_day in links %}
 <div class=date>{{links_for_day["date"]}}</div>
 <div class=link_bloc>
-%     for link in links_for_day["links"]:
+{%     for link in links_for_day["links"] %}
 <div class=link><img src="{{link.img_url}}" width=16/> <a href={{link.url}} title="{{link.title}}">{{link.title}}</a></div>
-%     end
+{%     endfor %}
 </div>
-% end
+{% endfor %}
 
 </div>
 </body>
