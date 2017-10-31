@@ -7,6 +7,7 @@ import datetime
 import logging
 import sqlite3
 import argparse
+import urllib.request
 
 import feedparser
 import flask
@@ -14,6 +15,8 @@ app = flask.Flask(__name__)
 
 import socket
 socket.setdefaulttimeout(10)
+
+import bs4
 
 
 class Feeds:
@@ -179,6 +182,27 @@ def update():
         save_feeds(feeds, db_connection)
     links = generate_links_list(feeds)
     return generate_index_html(links, errors)
+
+
+#@app.route("/favicon/<base_url:path>")
+def get_favicon_url(base_url):
+    req = urllib.request.Request(base_url, headers={'User-Agent': 'Mozilla/5.0'})
+    html = urllib.request.urlopen(req).read()
+    soup = bs4.BeautifulSoup(html, "html.parser")
+    icon_link = soup.find("link", rel="shortcut icon")
+    if icon_link is None:
+        icon_link = soup.find("link", rel="icon")
+    if icon_link is None:
+        logging.debug("No favicon found in html of " + base_url + ", trying default")
+        favicon = "%s/favicon.ico" % base_url
+        try:
+            urllib.request.urlopen(favicon)
+        except HTTPError:
+            logging.debug("Default favicon does not exist")
+            favicon = None
+    else:
+        favicon = icon_link['href']
+    return favicon
 
 
 if __name__ == "__main__":
