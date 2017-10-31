@@ -174,14 +174,17 @@ def feeds():
 
 @app.route("/update")
 def update():
+    update_feeds()
+    return flask.redirect("/")
+
+
+def update_feeds():
     with open("feeds.json", "r") as f:
         feeds = read_feeds_list(f)
     feeds.parse()
     errors = []
     with sqlite3.connect("cache.db") as db_connection:
         save_feeds(feeds, db_connection)
-    links = generate_links_list(feeds)
-    return flask.render_template("index.html", errors=errors, links=links)
 
 
 #@app.route("/favicon/<base_url:path>")
@@ -211,6 +214,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.update:
-        update()
+        update_feeds()
         sys.exit(0)
 
