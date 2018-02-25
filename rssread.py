@@ -188,10 +188,28 @@ def update_feeds():
 
 
 #@app.route("/favicon/<base_url:path>")
-def get_favicon_url(base_url):
+def get_feed_details(base_url):
     req = urllib.request.Request(base_url, headers={'User-Agent': 'Mozilla/5.0'})
     html = urllib.request.urlopen(req).read()
     soup = bs4.BeautifulSoup(html, "html.parser")
+
+    favicon = get_favicon(soup, base_url)
+    rss = get_rss(soup)
+
+    return (rss, favicon)
+
+
+def get_rss(soup):
+    rss_link = soup.find("link", type="application/rss+xml")
+    if rss_link is not None:
+        return rss_link["href"]
+    atom_link = soup.find("link", type="application/atom+xml")
+    if atom_link is not None:
+        return atom_link["href"]
+    return None
+
+
+def get_favicon(soup, base_url):
     icon_link = soup.find("link", rel="shortcut icon")
     if icon_link is None:
         icon_link = soup.find("link", rel="icon")
@@ -205,15 +223,21 @@ def get_favicon_url(base_url):
             favicon = None
     else:
         favicon = icon_link['href']
+    if favicon.startswith('/'):
+        favicon = base_url + favicon
     return favicon
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='simple rss read server')
     parser.add_argument("--update", action='store_true', help='Update feeds instead of running the server')
+    parser.add_argument("--parse_url", help='Get feed and favicon of given URL')
     args = parser.parse_args()
 
     if args.update:
         update_feeds()
         sys.exit(0)
+    if args.parse_url:
+        (rss, favicon) = get_feed_details(args.parse_url)
+        print('{{"url": "{url}", "img":"{icon}"}}'.format(url=rss, icon=favicon))
 
