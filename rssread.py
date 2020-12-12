@@ -34,8 +34,8 @@ class Feeds:
     def __str__(self):
         return "\n".join([str(feed) for feed in self.content])
 
-    def add_feed(self, url, img_url):
-        new_feed = Feed(url, img_url)
+    def add_feed(self, url, img_url, type):
+        new_feed = Feed(url, img_url, type)
         self.content.append(new_feed)
         return new_feed
 
@@ -52,9 +52,10 @@ class Feeds:
 
 
 class Feed:
-    def __init__(self, url, img_url=None):
+    def __init__(self, url, img_url=None, type=None):
         self.url = url
         self.img_url = img_url
+        self.type = type
         self.content = []
 
     def __str__(self):
@@ -93,6 +94,10 @@ class FeedEntry:
     def date(self):
         return self.timestamp.date()
 
+    @property
+    def type(self):
+        return self.parent_feed.type
+
 
 def date_to_str(date):
     return date.strftime("%Y-%m-%d %H:%M:%S")
@@ -102,7 +107,7 @@ def read_feeds_list(file_handle):
     parsed_feeds = json.load(file_handle)
     feeds = Feeds()
     for feed in parsed_feeds:
-        feeds.add_feed(feed["url"], feed.get("img", None))
+        feeds.add_feed(feed["url"], feed.get("img", None), feed.get("type", ""))
     return feeds
 
 
@@ -135,20 +140,20 @@ def generate_links_list(feeds):
 def save_feeds(feeds, db_connection):
     db_connection.execute('DROP TABLE IF EXISTS links')
     db_connection.execute('DROP TABLE IF EXISTS feeds')
-    db_connection.execute('CREATE TABLE IF NOT EXISTS feeds (id INTEGER PRIMARY KEY, url TEXT, img_url TEXT)')
+    db_connection.execute('CREATE TABLE IF NOT EXISTS feeds (id INTEGER PRIMARY KEY, url TEXT, img_url TEXT, type TEXT)')
     db_connection.execute('CREATE TABLE IF NOT EXISTS links (feed_id INTEGER, title TEXT, url TEXT, timestamp TEXT, FOREIGN KEY(feed_id) REFERENCES feeds(id))')
     for ifeed, feed in enumerate(feeds.content):
-        db_connection.execute('INSERT INTO feeds VALUES (?, ?, ?)', (ifeed, feed.url, feed.img_url))
+        db_connection.execute('INSERT INTO feeds VALUES (?, ?, ?, ?)', (ifeed, feed.url, feed.img_url, feed.type))
         for link in feed.content:
             db_connection.execute('INSERT INTO links VALUES (?, ?, ?, ?)', (ifeed, link.title, link.url, date_to_str(link.timestamp)))
     db_connection.commit()
 
 
-def get_saved_feeds(db_connection):
+def get_saved_feeds(db_connection, type):
     feeds = Feeds()
     feed_cursor = db_connection.cursor()
-    for feed_row in feed_cursor.execute('SELECT * FROM feeds'):
-        feed = feeds.add_feed(feed_row[1], feed_row[2])
+    for feed_row in feed_cursor.execute('SELECT * FROM feeds WHERE type=?', (type,)):
+        feed = feeds.add_feed(feed_row[1], feed_row[2], feed_row[3])
         link_cursor = db_connection.cursor()
         for link_row in link_cursor.execute('SELECT * FROM links WHERE feed_id=?', (feed_row[0],)):
             timestamp = datetime.datetime.strptime(link_row[3], "%Y-%m-%d %H:%M:%S")
@@ -159,11 +164,18 @@ def get_saved_feeds(db_connection):
 @app.route("/")
 def root():
     with sqlite3.connect("cache.db") as db_connection:
-        feeds = get_saved_feeds(db_connection)
+        feeds = get_saved_feeds(db_connection, "")
     links = generate_links_list(feeds)
     errors = []
     return flask.render_template("index.html", errors=errors, links=links)
 
+@app.route("/actu")
+def actu():
+    with sqlite3.connect("cache.db") as db_connection:
+        feeds = get_saved_feeds(db_connection, "actu")
+    links = generate_links_list(feeds)
+    errors = []
+    return flask.render_template("index.html", errors=errors, links=links)
 
 @app.route("/feeds")
 def feeds():
